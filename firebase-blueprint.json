@@ -1,0 +1,144 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Information about a user (client or feirante).",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "role": { "type": "string", "enum": ["cliente", "feirante", "admin"] },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "ContactMessage": {
+      "title": "Contact Message",
+      "description": "A message sent via the 'Fale Conosco' form.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "state": { "type": "string", "description": "UF do estado" },
+        "subject": { "type": "string" },
+        "message": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["name", "email", "subject", "message", "createdAt"]
+    },
+    "Store": {
+      "title": "Store",
+      "description": "A store or 'barraca' in the market.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "category": { "type": "string", "enum": ["barraca", "feira_livre", "mercado_livre", "restaurante"] },
+        "address": { "type": "string" },
+        "state": { "type": "string", "description": "UF do estado" },
+        "latitude": { "type": "number" },
+        "longitude": { "type": "number" },
+        "imageUrl": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["id", "ownerId", "name"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "A product sold in a store.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "storeId": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "price": { "type": "number" },
+        "unit": { "type": "string", "enum": ["kg", "g", "unidade", "saco", "prato"] },
+        "category": { "type": "string", "enum": ["verduras", "legumes", "frutas", "carne_boi", "carne_galinha", "peixe", "refeicao"] },
+        "imageUrl": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["id", "storeId", "name", "price"]
+    },
+    "Chat": {
+      "title": "Chat Session",
+      "description": "A chat session between a user and support or another user.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "participants": { "type": "array", "items": { "type": "string" } },
+        "type": { "type": "string", "enum": ["support", "direct"] },
+        "lastMessage": { "type": "string" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["id", "participants", "type", "updatedAt"]
+    },
+    "ChatMessage": {
+      "title": "Chat Message",
+      "description": "A message within a chat session.",
+      "type": "object",
+      "properties": {
+        "chatId": { "type": "string" },
+        "senderId": { "type": "string" },
+        "text": { "type": "string" },
+        "type": { "type": "string", "enum": ["text", "audio", "video"] },
+        "mediaUrl": { "type": "string" },
+        "isAutoMessage": { "type": "boolean" },
+        "isEdited": { "type": "boolean" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["chatId", "senderId", "text", "createdAt"]
+    },
+    "Review": {
+      "title": "Store Review",
+      "description": "A review left by a customer for a store.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "storeId": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userPhotoURL": { "type": "string" },
+        "rating": { "type": "number", "description": "Rating from 1 to 5" },
+        "comment": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["id", "storeId", "userId", "userName", "rating", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/contact_messages/{messageId}": {
+      "schema": "ContactMessage",
+      "description": "Messages from the contact form"
+    },
+    "/stores/{storeId}": {
+      "schema": "Store",
+      "description": "Market stores"
+    },
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Store products"
+    },
+    "/chats/{chatId}": {
+      "schema": "Chat",
+      "description": "Chat sessions"
+    },
+    "/chats/{chatId}/messages/{messageId}": {
+      "schema": "ChatMessage",
+      "description": "Messages within a chat"
+    },
+    "/reviews/{reviewId}": {
+      "schema": "Review",
+      "description": "Store reviews"
+    }
+  }
+}

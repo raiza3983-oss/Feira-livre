@@ -1,0 +1,5 @@
+{
+  "name": "Feira Livre",
+  "description": "Plataforma para feirantes e clientes gerenciarem barracas, produtos e chat em tempo real.",
+  "requestFramePermissions": ["geolocation", "camera", "microphone"]
+}

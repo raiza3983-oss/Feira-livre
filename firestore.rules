@@ -1,0 +1,224 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {uid}
+    // Fields:
+    //   - uid: string (required) - Firebase Auth UID
+    //   - email: string (required) - User email
+    //   - displayName: string (optional) - User display name
+    //   - photoURL: string (optional) - User photo URL
+    //   - role: string (required, enum: ['cliente', 'feirante', 'admin']) - User role
+    //   - createdAt: number (required) - Creation timestamp
+    //
+    // Collection: contact_messages
+    // Document ID: {messageId}
+    // Fields:
+    //   - name: string (required) - Sender name
+    //   - email: string (required) - Sender email
+    //   - subject: string (required) - Message subject
+    //   - message: string (required) - Message content
+    //   - createdAt: number (required) - Creation timestamp
+    //
+    // Collection: stores
+    // Document ID: {storeId}
+    // Fields:
+    //   - id: string (required) - Store ID
+    //   - ownerId: string (required) - Owner UID
+    //   - name: string (required) - Store name
+    //   - description: string (optional) - Store description
+    //   - category: string (optional) - Store category
+    //   - address: string (optional) - Store address
+    //   - state: string (optional) - Store state (UF)
+    //   - imageUrl: string (optional) - Store image URL
+    //   - createdAt: number (required) - Creation timestamp
+    //
+    // Collection: products
+    // Document ID: {productId}
+    // Fields:
+    //   - id: string (required) - Product ID
+    //   - storeId: string (required) - Store ID
+    //   - name: string (required) - Product name
+    //   - description: string (optional) - Product description
+    //   - price: number (required) - Product price
+    //   - unit: string (optional) - Product unit
+    //   - category: string (optional) - Product category
+    //   - imageUrl: string (optional) - Product image URL
+    //   - createdAt: number (required) - Creation timestamp
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        ((exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
+          (request.auth.token.email == "raiza3983@gmail.com") ||
+          (request.auth.token.email == "Raizapaula@outlook.com.br"));
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    // ===============================================================
+    // Collection Rules
+    // ===============================================================
+
+    // Users collection
+    match /users/{uid} {
+      function isValidUser(data) {
+        return hasRequiredFields(['uid', 'email', 'role', 'createdAt']) &&
+               hasOnlyAllowedFields(['uid', 'email', 'displayName', 'photoURL', 'role', 'createdAt']) &&
+               data.uid is string &&
+               data.email is string && isValidEmail(data.email) &&
+               data.role in ['cliente', 'feirante', 'admin'] &&
+               data.createdAt is number;
+      }
+
+      allow read: if isOwner(uid) || isAdmin();
+      allow create: if isAuthenticated() && isOwner(uid) && isValidUser(request.resource.data) && (request.resource.data.role != 'admin' || isAdmin());
+      allow update: if isAuthenticated() && isOwner(uid) && isValidUser(request.resource.data) && (request.resource.data.role == resource.data.role || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // Contact messages collection
+    match /contact_messages/{messageId} {
+      function isValidMessage(data) {
+        return hasRequiredFields(['name', 'email', 'state', 'subject', 'message', 'createdAt']) &&
+               hasOnlyAllowedFields(['name', 'email', 'state', 'subject', 'message', 'createdAt']) &&
+               data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+               data.email is string && isValidEmail(data.email) &&
+               data.state is string && data.state.size() == 2 &&
+               data.subject is string && data.subject.size() > 0 && data.subject.size() < 200 &&
+               data.message is string && data.message.size() > 0 && data.message.size() < 5000 &&
+               data.createdAt is number;
+      }
+
+      allow read: if isAdmin();
+      allow create: if isValidMessage(request.resource.data);
+      allow update, delete: if isAdmin();
+    }
+
+    // Stores collection
+    match /stores/{storeId} {
+      function isValidStore(data) {
+        return hasRequiredFields(['id', 'ownerId', 'name', 'createdAt']) &&
+               hasOnlyAllowedFields(['id', 'ownerId', 'name', 'description', 'category', 'address', 'state', 'imageUrl', 'createdAt']) &&
+               data.id is string &&
+               data.ownerId is string &&
+               data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+               (!('category' in data) || data.category in ['barraca', 'feira_livre', 'mercado_livre', 'restaurante']) &&
+               (!('state' in data) || (data.state is string && data.state.size() == 2)) &&
+               data.createdAt is number;
+      }
+
+      allow read: if true;
+      allow create: if isAuthenticated() && isValidStore(request.resource.data) && (request.resource.data.ownerId == request.auth.uid || isAdmin());
+      allow update: if isAuthenticated() && isValidStore(request.resource.data) && (resource.data.ownerId == request.auth.uid || isAdmin());
+      allow delete: if isAuthenticated() && (resource.data.ownerId == request.auth.uid || isAdmin());
+    }
+
+    // Products collection
+    match /products/{productId} {
+      function isValidProduct(data) {
+        return hasRequiredFields(['id', 'storeId', 'name', 'price', 'createdAt']) &&
+               hasOnlyAllowedFields(['id', 'storeId', 'name', 'description', 'price', 'unit', 'category', 'imageUrl', 'createdAt']) &&
+               data.id is string &&
+               data.storeId is string &&
+               data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+               data.price is number && data.price >= 0 &&
+               (!('unit' in data) || data.unit in ['kg', 'g', 'unidade', 'saco', 'prato']) &&
+               (!('category' in data) || data.category in ['verduras', 'legumes', 'frutas', 'carne_boi', 'carne_galinha', 'peixe', 'refeicao']) &&
+               data.createdAt is number;
+      }
+
+      allow read: if true;
+      allow create: if isAuthenticated() && isValidProduct(request.resource.data) && (get(/databases/$(database)/documents/stores/$(request.resource.data.storeId)).data.ownerId == request.auth.uid || isAdmin());
+      allow update: if isAuthenticated() && isValidProduct(request.resource.data) && (get(/databases/$(database)/documents/stores/$(resource.data.storeId)).data.ownerId == request.auth.uid || isAdmin());
+      allow delete: if isAuthenticated() && (get(/databases/$(database)/documents/stores/$(resource.data.storeId)).data.ownerId == request.auth.uid || isAdmin());
+    }
+
+    // Chats collection
+    match /chats/{chatId} {
+      function isParticipant() {
+        return isAuthenticated() && (request.auth.uid in resource.data.participants || isAdmin());
+      }
+
+      function isValidChat(data) {
+        return hasRequiredFields(['id', 'participants', 'type', 'updatedAt']) &&
+               data.id is string &&
+               data.participants is list &&
+               data.type in ['support', 'direct'] &&
+               data.updatedAt is number;
+      }
+
+      allow read: if isParticipant();
+      allow create: if isAuthenticated() && isValidChat(request.resource.data) && (request.auth.uid in request.resource.data.participants || isAdmin());
+      allow update: if isParticipant() && isValidChat(request.resource.data);
+      allow delete: if isAdmin();
+
+      // Messages subcollection
+      match /messages/{messageId} {
+        function isValidMessage(data) {
+          return hasRequiredFields(['chatId', 'senderId', 'text', 'createdAt']) &&
+                 hasOnlyAllowedFields(['chatId', 'senderId', 'text', 'type', 'mediaUrl', 'isAutoMessage', 'isEdited', 'createdAt', 'updatedAt']) &&
+                 data.chatId == chatId &&
+                 data.senderId == request.auth.uid &&
+                 data.text is string && data.text.size() < 10000 &&
+                 (!('type' in data) || data.type in ['text', 'audio', 'video']) &&
+                 (!('mediaUrl' in data) || (data.mediaUrl is string || data.mediaUrl == null)) &&
+                 data.createdAt is number;
+        }
+
+        allow read: if isParticipant();
+        allow create: if isParticipant() && isValidMessage(request.resource.data);
+        allow update: if isParticipant() && (request.auth.uid == resource.data.senderId || isAdmin());
+        allow delete: if isAdmin();
+      }
+    }
+
+    // Reviews collection
+    match /reviews/{reviewId} {
+      function isValidReview(data) {
+        return hasRequiredFields(['id', 'storeId', 'userId', 'userName', 'rating', 'createdAt']) &&
+               hasOnlyAllowedFields(['id', 'storeId', 'userId', 'userName', 'userPhotoURL', 'rating', 'comment', 'createdAt']) &&
+               data.id is string &&
+               data.storeId is string &&
+               data.userId == request.auth.uid &&
+               data.userName is string && data.userName.size() > 0 &&
+               data.rating is number && data.rating >= 1 && data.rating <= 5 &&
+               (!('comment' in data) || (data.comment is string && data.comment.size() <= 1000)) &&
+               data.createdAt is number;
+      }
+
+      allow read: if true;
+      allow create: if isAuthenticated() && isValidReview(request.resource.data) && reviewId == request.resource.data.storeId + "_" + request.auth.uid;
+      allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin()) && isValidReview(request.resource.data);
+      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+  }
+}
